@@ -1,9 +1,19 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
 export default function MetricsProvider({ children }) {
+  const pathname = usePathname();
+  
   useEffect(() => {
+    // Only initialize metrics on dashboard pages to avoid slowing down public pages
+    const isDashboardPage = pathname?.startsWith('/dashboard');
+    
+    if (!isDashboardPage) {
+      return;
+    }
+
     // Initialize metrics collection on client side
     const initializeMetrics = async () => {
       try {
@@ -22,10 +32,10 @@ export default function MetricsProvider({ children }) {
     };
 
     // Initialize metrics after a short delay to ensure the app is loaded
-    const timer = setTimeout(initializeMetrics, 2000);
+    const timer = setTimeout(initializeMetrics, 1000); // Reduced from 2000ms to 1000ms
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [pathname]);
 
   return <>{children}</>;
 }

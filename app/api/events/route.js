@@ -29,25 +29,42 @@ export async function GET(request) {
       send({ type: 'connected', at: Date.now(), channels });
 
       let client; let db; let watchers = [];
-      try {
-        client = await clientPromise;
-        db = client.db(process.env.MONGODB_DB);
-        const names = channels.length ? channels : ['gate_logs','staff_attendance','staff_shifts','staff_tasks','alerts'];
-        for (const name of names) {
-          try {
-            const collection = db.collection(name);
-            const changeStream = collection.watch([], { fullDocument: 'updateLookup' });
-            changeStream.on('change', (change) => {
-              send({ type: 'change', collection: name, change });
-            });
-            watchers.push(changeStream);
-          } catch {
-            // ignore invalid collection
+      
+      // Send initial connection confirmation immediately
+      send({ type: 'ready', at: Date.now() });
+      
+      // Initialize change streams asynchronously to reduce initial connection time
+      setTimeout(async () => {
+        try {
+          client = await clientPromise;
+          db = client.db(process.env.MONGODB_DB);
+          const names = channels.length ? channels : ['gate_logs','staff_attendance','staff_shifts','staff_tasks','alerts'];
+          
+          // Limit concurrent change stream initialization
+          const batchSize = 2;
+          for (let i = 0; i < names.length; i += batchSize) {
+            const batch = names.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (name) => {
+              try {
+                const collection = db.collection(name);
+                const changeStream = collection.watch([], { 
+                  fullDocument: 'updateLookup',
+                  maxAwaitTimeMS: 1000 // Reduce timeout
+                });
+                changeStream.on('change', (change) => {
+                  send({ type: 'change', collection: name, change });
+                });
+                watchers.push(changeStream);
+                send({ type: 'stream_ready', collection: name, at: Date.now() });
+              } catch (error) {
+                send({ type: 'stream_error', collection: name, error: error.message });
+              }
+            }));
           }
+        } catch (e) {
+          send({ type: 'error', message: 'Failed to open change streams', error: e.message });
         }
-      } catch (e) {
-        send({ type: 'error', message: 'Failed to open change streams' });
-      }
+      }, 100); // Small delay to allow response to be sent first
 
       const abort = request.signal;
       const onAbort = () => {

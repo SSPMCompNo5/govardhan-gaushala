@@ -77,35 +77,47 @@ export async function GET(request) {
       healthData.status = 'degraded';
     }
 
-    // Test API endpoints
-    const apiTests = [
-      { name: 'gate-logs', endpoint: '/api/gate-logs' },
-      { name: 'inventory', endpoint: '/api/food/inventory' },
-      { name: 'cows', endpoint: '/api/goshala-manager/cows' }
-    ];
-
-    healthData.services.apis = {};
-    for (const test of apiTests) {
-      try {
-        const apiStartTime = Date.now();
-        const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}${test.endpoint}`, {
-          headers: {
-            'Cookie': request.headers.get('cookie') || ''
-          }
-        });
-        const apiResponseTime = Date.now() - apiStartTime;
+    // Test database collections directly (faster than API calls)
+    healthData.services.collections = {};
+    try {
+      const collections = ['gate_logs', 'foodInventory', 'cows'];
+      for (const collectionName of collections) {
+        const collStartTime = Date.now();
+        const collection = db.collection(collectionName);
+        const count = await collection.countDocuments({}, { limit: 1 });
+        const collResponseTime = Date.now() - collStartTime;
         
-        healthData.services.apis[test.name] = {
-          status: response.ok ? 'healthy' : 'degraded',
-          responseTime: apiResponseTime,
-          statusCode: response.status
-        };
-      } catch (error) {
-        healthData.services.apis[test.name] = {
-          status: 'unhealthy',
-          error: error.message
+        healthData.services.collections[collectionName] = {
+          status: 'healthy',
+          responseTime: collResponseTime,
+          accessible: true
         };
       }
+    } catch (error) {
+      healthData.services.collections = {
+        status: 'unhealthy',
+        error: error.message
+      };
+    }
+
+    // Test Redis connection
+    try {
+      const redisStartTime = Date.now();
+      const { redis } = await import('@/lib/redis');
+      await redis.ping();
+      const redisResponseTime = Date.now() - redisStartTime;
+      
+      healthData.services.redis = {
+        status: 'healthy',
+        responseTime: redisResponseTime,
+        connection: 'active'
+      };
+    } catch (error) {
+      healthData.services.redis = {
+        status: 'unhealthy',
+        error: error.message
+      };
+      healthData.status = 'degraded';
     }
 
     // System performance metrics

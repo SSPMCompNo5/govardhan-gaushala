@@ -39,8 +39,8 @@ export async function middleware(req) {
   const isDev = process.env.NODE_ENV !== 'production';
   const CSP = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'";
 
-  // Allow auth, CSRF, and test routes to pass through
-  if (pathname.startsWith("/api/auth") || pathname === "/api/csrf" || pathname === "/api/test-redis" || pathname === "/api/test-auth") {
+  // Allow auth, CSRF, test, and seed routes to pass through
+  if (pathname.startsWith("/api/auth") || pathname === "/api/csrf" || pathname === "/api/test-redis" || pathname === "/api/test-auth" || pathname.startsWith("/api/seed/")) {
     return NextResponse.next();
   }
 

@@ -3,7 +3,6 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import Script from "next/script";
 import SessionProviderWrapper from "../components/providers/SessionProviderWrapper";
-import MetricsProvider from "../components/providers/MetricsProvider";
 import HelpLauncher from "../components/help/HelpLauncher";
 
 export const metadata = {
@@ -49,12 +48,10 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased min-h-screen`}>
         <SessionProviderWrapper>
-          <MetricsProvider>
-            <div className="min-h-screen bg-background">
-              {children}
-              <HelpLauncher />
-            </div>
-          </MetricsProvider>
+          <div className="min-h-screen bg-background">
+            {children}
+            <HelpLauncher />
+          </div>
         </SessionProviderWrapper>
         <Script id="service-worker" strategy="afterInteractive">
           {`

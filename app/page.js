@@ -48,20 +48,10 @@ function LoginPageContent({ nextUrl }) {
   const handleLogout = async () => {
     try {
       await signOut({ callbackUrl: '/' });
-      setIsLoggedIn(false);
     } catch (error) {
       console.error('Error during logout:', error);
     }
   };
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (status === "authenticated") {
-      router.replace(nextUrl || "/dashboard");
-    } else if (status === "unauthenticated") {
-      setIsLoading(false);
-    }
-  }, [status, router, nextUrl]);
 
   const validateForm = () => {
     const newErrors = {};

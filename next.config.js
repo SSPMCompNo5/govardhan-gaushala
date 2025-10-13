@@ -17,17 +17,44 @@ const nextConfig = {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
   
-  // Webpack configuration
-  webpack: (config, { isServer }) => {
+  // Webpack configuration with performance optimizations
+  webpack: (config, { isServer, dev }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
+        'fs/promises': false,
+        path: false,
+        crypto: false,
         net: false,
         tls: false,
+        dns: false,
+        child_process: false,
+        'timers/promises': false,
       };
     }
+    
+    // Performance optimizations
+    if (!dev) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+          },
+        },
+      };
+    }
+    
     return config;
+  },
+
+  // Performance optimizations
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ['@radix-ui/react-dialog', '@radix-ui/react-select', 'lucide-react'],
   },
   
   // Headers for security
@@ -56,11 +83,12 @@ const nextConfig = {
   // Redirects
   async redirects() {
     return [
-      {
-        source: '/dashboard',
-        destination: '/dashboard/admin',
-        permanent: false,
-      },
+      // Remove automatic admin redirect - let middleware handle role-based routing
+      // {
+      //   source: '/dashboard',
+      //   destination: '/dashboard/admin',
+      //   permanent: false,
+      // },
     ];
   },
 };

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import Sidebar from "@/components/dashboard/Sidebar";
+import MetricsProvider from "@/components/providers/MetricsProvider";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,22 +38,24 @@ export default function DashboardLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <DashboardHeader />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main 
-          className={cn(
-            'flex-1 overflow-y-auto p-4 md:p-6 bg-muted/20',
-            'transition-all duration-300 ease-in-out',
-            'ml-16' // Default collapsed width
-          )}
-        >
-          <div className="mx-auto max-w-7xl">
-            {children}
-          </div>
-        </main>
+    <MetricsProvider>
+      <div className="min-h-screen bg-background flex flex-col">
+        <DashboardHeader />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <main 
+            className={cn(
+              'flex-1 overflow-y-auto p-4 md:p-6 bg-muted/20',
+              'transition-all duration-300 ease-in-out',
+              'ml-16' // Default collapsed width
+            )}
+          >
+            <div className="mx-auto max-w-7xl">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </MetricsProvider>
   );
 }
