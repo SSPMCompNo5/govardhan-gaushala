@@ -1,6 +1,7 @@
 # Govardhan Goshala Documentation (Non‑Technical)
 
 Start here:
+- **[SRS](./SRS.md) – Software Requirements Specification (Complete system requirements)**
 - [OVERVIEW](./OVERVIEW.md) – Friendly system overview and story
 - [DASHBOARDS](./DASHBOARDS.md) – Admin, Watchman, Food Manager
 - [API](./API.md) – Endpoints and usage (with CSRF and rate limits)

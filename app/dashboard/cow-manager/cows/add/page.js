@@ -24,8 +24,14 @@ export default function AddCowPage() {
     photoUrl: ''
   });
 
-  const getCSRF = () => {
-    try { const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); return m?decodeURIComponent(m[1]):''; } catch { return ''; }
+  const getCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf');
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
   };
 
   const onSubmit = async (e) => {
@@ -34,11 +40,13 @@ export default function AddCowPage() {
     try {
       const payload = {
         ...form,
+        status: form.health === 'healthy' ? 'normal' : 'sick',
         pregnant: form.pregnant === 'true',
         birthDate: form.birthDate || undefined,
         photoUrl: form.photoUrl || undefined,
       };
-      const res = await fetch('/api/goshala-manager/cows', {
+      delete payload.health;
+      const res = await fetch('/api/cow-manager/cows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
         credentials: 'same-origin',

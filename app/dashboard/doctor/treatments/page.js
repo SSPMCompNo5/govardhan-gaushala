@@ -64,7 +64,7 @@ export default function DoctorTreatmentsPage() {
       if (filters.medicine) p.set('medicine', filters.medicine);
       if (filters.dateFrom) p.set('dateFrom', filters.dateFrom);
       if (filters.dateTo) p.set('dateTo', filters.dateTo);
-      const res = await fetch(`/api/goshala-manager/health/treatments?${p.toString()}`, { cache: 'no-store' });
+      const res = await fetch(`/api/doctor/treatments?${p.toString()}`, { cache: 'no-store' });
       const data = await res.json();
       if (res.ok) setTreatments(data.treatments || []);
     } finally {
@@ -82,7 +82,7 @@ export default function DoctorTreatmentsPage() {
   const onCreate = async () => {
     try {
       const payload = { ...form, startedAt: form.startedAt || new Date().toISOString(), attachments: attachments };
-      const res = await fetch('/api/goshala-manager/health/treatments', {
+      const res = await fetch('/api/doctor/treatments', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() }, credentials: 'same-origin',
         body: JSON.stringify(payload)
       });
@@ -118,7 +118,7 @@ export default function DoctorTreatmentsPage() {
     const note = prompt('Follow-up note (optional):') || '';
     const when = prompt('Follow-up when (YYYY-MM-DD or ISO):', new Date(Date.now()+7*24*60*60*1000).toISOString().slice(0,16)) || '';
     try {
-      const res = await fetch('/api/goshala-manager/health/treatments', {
+      const res = await fetch('/api/doctor/treatments', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() }, credentials: 'same-origin',
         body: JSON.stringify({ id, followUp: { when, notes: note } })
       });
@@ -136,7 +136,7 @@ export default function DoctorTreatmentsPage() {
     const newOutcome = outcomes[nextIndex];
     
     try {
-      const res = await fetch('/api/goshala-manager/health/treatments', {
+      const res = await fetch('/api/doctor/treatments', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() }, credentials: 'same-origin',
         body: JSON.stringify({ id, outcome: newOutcome })
       });

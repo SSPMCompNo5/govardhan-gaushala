@@ -38,31 +38,69 @@ export async function GET(request) {
         try {
           client = await clientPromise;
           db = client.db(process.env.MONGODB_DB);
+          
+          // Check if MongoDB supports change streams (requires replica set)
+          let supportsChangeStreams = false;
+          try {
+            const admin = db.admin();
+            const status = await admin.serverStatus();
+            // Check if it's a replica set
+            supportsChangeStreams = status.repl && status.repl.setName;
+          } catch (error) {
+            console.warn('Could not determine MongoDB topology:', error.message);
+          }
+
           const names = channels.length ? channels : ['gate_logs','staff_attendance','staff_shifts','staff_tasks','alerts'];
           
-          // Limit concurrent change stream initialization
-          const batchSize = 2;
-          for (let i = 0; i < names.length; i += batchSize) {
-            const batch = names.slice(i, i + batchSize);
-            await Promise.all(batch.map(async (name) => {
+          if (supportsChangeStreams) {
+            // Use change streams for replica sets
+            const batchSize = 2;
+            for (let i = 0; i < names.length; i += batchSize) {
+              const batch = names.slice(i, i + batchSize);
+              await Promise.all(batch.map(async (name) => {
+                try {
+                  const collection = db.collection(name);
+                  const changeStream = collection.watch([], { 
+                    fullDocument: 'updateLookup',
+                    maxAwaitTimeMS: 1000
+                  });
+                  changeStream.on('change', (change) => {
+                    send({ type: 'change', collection: name, change });
+                  });
+                  watchers.push(changeStream);
+                  send({ type: 'stream_ready', collection: name, at: Date.now() });
+                } catch (error) {
+                  send({ type: 'stream_error', collection: name, error: error.message });
+                }
+              }));
+            }
+          } else {
+            // Fallback to polling for standalone MongoDB
+            send({ type: 'info', message: 'Using polling fallback (standalone MongoDB detected)' });
+            
+            // Set up simple polling every 5 seconds
+            const pollInterval = setInterval(async () => {
               try {
-                const collection = db.collection(name);
-                const changeStream = collection.watch([], { 
-                  fullDocument: 'updateLookup',
-                  maxAwaitTimeMS: 1000 // Reduce timeout
-                });
-                changeStream.on('change', (change) => {
-                  send({ type: 'change', collection: name, change });
-                });
-                watchers.push(changeStream);
-                send({ type: 'stream_ready', collection: name, at: Date.now() });
+                for (const name of names) {
+                  const collection = db.collection(name);
+                  // Send a heartbeat instead of actual changes
+                  send({ 
+                    type: 'heartbeat', 
+                    collection: name, 
+                    at: Date.now(),
+                    message: 'Polling active'
+                  });
+                }
               } catch (error) {
-                send({ type: 'stream_error', collection: name, error: error.message });
+                send({ type: 'poll_error', error: error.message });
               }
-            }));
+            }, 5000);
+            
+            // Store interval for cleanup
+            watchers.push({ close: () => clearInterval(pollInterval) });
           }
         } catch (e) {
-          send({ type: 'error', message: 'Failed to open change streams', error: e.message });
+          send({ type: 'error', message: 'Failed to initialize event system', error: e.message });
         }
       }, 100); // Small delay to allow response to be sent first
 

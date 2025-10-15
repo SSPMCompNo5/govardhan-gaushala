@@ -33,7 +33,13 @@ export async function POST(request) {
     if (existing && force) {
       await users.updateOne(
         { userId },
-        { $set: { passwordHash, role, updatedAt: new Date() } }
+        { $set: { 
+          passwordHash, 
+          password: passwordHash, 
+          role, 
+          active: true,
+          updatedAt: new Date() 
+        } }
       );
       return NextResponse.json({ ok: true, created: false, updated: true });
     }
@@ -43,8 +49,12 @@ export async function POST(request) {
       {
         $setOnInsert: {
           userId,
+          name: userId, // Use userId as name for admin user
+          email: `${userId}@goshala.local`, // Generate a local email
           passwordHash,
+          password: passwordHash, // Also set password field as expected by schema
           role,
+          active: true,
           createdAt: new Date(),
         },
       },

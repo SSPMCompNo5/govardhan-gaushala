@@ -34,26 +34,33 @@ const nextConfig = {
       };
     }
     
-    // Performance optimizations
-    if (!dev) {
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-          },
-        },
-      };
+    // Fix pdf-lib SSR issues
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('pdf-lib');
     }
+    
+    // Performance optimizations disabled for build debugging
+    // if (!dev) {
+    //   config.optimization.splitChunks = {
+    //     chunks: 'all',
+    //     cacheGroups: {
+    //       vendor: {
+    //         test: /[\\/]node_modules[\\/](?!pdf-lib)/,
+    //         name: 'vendors',
+    //         chunks: 'all',
+    //       },
+    //     },
+    //   };
+    // }
     
     return config;
   },
 
   // Performance optimizations
   experimental: {
-    optimizeCss: true,
+    // Disable CSS optimization to fix Docker build issues
+    // optimizeCss: true,
     optimizePackageImports: ['@radix-ui/react-dialog', '@radix-ui/react-select', 'lucide-react'],
   },
   

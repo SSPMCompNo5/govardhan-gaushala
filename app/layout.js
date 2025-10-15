@@ -53,30 +53,7 @@ export default function RootLayout({ children }) {
             <HelpLauncher />
           </div>
         </SessionProviderWrapper>
-        <Script id="service-worker" strategy="afterInteractive">
-          {`
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                  .then(registration => {
-                    console.log('ServiceWorker registration successful');
-                  })
-                  .catch(error => {
-                    console.log('ServiceWorker registration failed: ', error);
-                  });
-              });
-              
-              // Listen for controllerchange event to handle page refreshes
-              let refreshing = false;
-              navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (!refreshing) {
-                  window.location.reload();
-                  refreshing = true;
-                }
-              });
-            }
-          `}
-        </Script>
+
       </body>
     </html>
   );
