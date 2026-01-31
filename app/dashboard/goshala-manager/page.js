@@ -1,11 +1,52 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, memo, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Users, Package, Calendar, Shield } from 'lucide-react';
+import { RefreshCw, Users, Package, Calendar, Shield, AlertTriangle, Heart, DollarSign, Wrench, FileText } from 'lucide-react';
+
+// Memoized stat card
+const StatCard = memo(function StatCard({ title, value, icon: Icon }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex items-center gap-2">
+        <Icon className="h-5 w-5 text-muted-foreground" />
+        <span className="text-2xl font-bold">{value}</span>
+      </CardContent>
+    </Card>
+  );
+});
+
+// Memoized quick link
+const QuickLink = memo(function QuickLink({ href, icon: Icon, label }) {
+  return (
+    <Button asChild variant="secondary" size="sm">
+      <Link href={href} className="flex items-center gap-2">
+        <Icon className="h-4 w-4" />
+        {label}
+      </Link>
+    </Button>
+  );
+});
+
+// Loading skeleton
+function LoadingSkeleton() {
+  return (
+    <div className="w-full max-w-7xl mx-auto space-y-4 p-6">
+      <div className="h-8 bg-muted rounded w-64 animate-pulse" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-24 bg-muted rounded-lg animate-pulse" />
+        ))}
+      </div>
+      <div className="h-24 bg-muted rounded-lg animate-pulse" />
+    </div>
+  );
+}
 
 export default function GoshalaManagerDashboard() {
   const [loading, setLoading] = useState(true);
@@ -17,109 +58,94 @@ export default function GoshalaManagerDashboard() {
     staffOnDuty: 0
   });
 
-  const fetchData = useCallback(async () => {
+  const mountedRef = useRef(true);
+  const cacheRef = useRef({ data: null, timestamp: 0 });
+  const CACHE_TTL = 30000;
+
+  const fetchData = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && cacheRef.current.data && (now - cacheRef.current.timestamp) < CACHE_TTL) {
+      return;
+    }
+
     try {
       setRefreshing(true);
-      const [inventoryRes, schedulesRes, cowsRes] = await Promise.all([
-        fetch('/api/food/inventory?limit=50', { cache: 'no-store' }),
-        fetch('/api/food/schedule?isActive=true', { cache: 'no-store' }),
-        fetch('/api/goshala-manager/cows?limit=100', { cache: 'no-store' })
-      ]);
-      const [inventoryData, schedulesData, cowsData] = await Promise.all([
-        inventoryRes.json(),
-        schedulesRes.json(),
-        cowsRes.json()
+
+      const results = await Promise.allSettled([
+        fetch('/api/food/inventory?limit=30').then(r => r.json()),
+        fetch('/api/food/schedule?isActive=true&limit=10').then(r => r.json()),
+        fetch('/api/goshala-manager/cows?limit=50').then(r => r.json())
       ]);
 
-      const lowStockItems = (inventoryData.inventory || []).filter(i => i.status === 'low' || i.status === 'critical').length;
-      const activeSchedules = (schedulesData.schedules || []).length;
-      const totalCattle = (cowsData.cows || []).length;
+      if (!mountedRef.current) return;
+
+      const [inventoryResult, schedulesResult, cowsResult] = results;
+
+      const inventoryData = inventoryResult.status === 'fulfilled' ? inventoryResult.value : { inventory: [] };
+      const schedulesData = schedulesResult.status === 'fulfilled' ? schedulesResult.value : { schedules: [] };
+      const cowsData = cowsResult.status === 'fulfilled' ? cowsResult.value : { cows: [] };
 
       setStats({
-        totalCattle,
-        activeSchedules,
-        lowStockItems,
-        staffOnDuty: 0 // placeholder for staff roster
+        totalCattle: cowsData.cows?.length || 0,
+        activeSchedules: schedulesData.schedules?.length || 0,
+        lowStockItems: (inventoryData.inventory || []).filter(i => i.status === 'low' || i.status === 'critical').length,
+        staffOnDuty: 0
       });
+
+      cacheRef.current = { data: true, timestamp: Date.now() };
     } finally {
-      setRefreshing(false);
-      setLoading(false);
+      if (mountedRef.current) {
+        setRefreshing(false);
+        setLoading(false);
+      }
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+    return () => { mountedRef.current = false; };
+  }, [fetchData]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen w-full p-6">
-        <div className="w-full max-w-7xl mx-auto space-y-6">
-          <div className="flex items-center justify-center h-64">
-            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingSkeleton />;
 
   return (
-    <div className="min-h-screen w-full p-6">
-      <div className="w-full max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Goshala Manager Dashboard</h1>
-            <p className="text-muted-foreground">Overview of operations and key alerts.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={fetchData} disabled={refreshing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
+    <div className="w-full max-w-7xl mx-auto space-y-4 p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Goshala Manager</h1>
+          <p className="text-muted-foreground text-sm">Operations overview</p>
         </div>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader><CardTitle>Total Cattle</CardTitle></CardHeader>
-            <CardContent className="text-3xl font-bold flex items-center gap-2">
-              <Users className="h-5 w-5" /> {stats.totalCattle}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Active Schedules</CardTitle></CardHeader>
-            <CardContent className="text-3xl font-bold flex items-center gap-2">
-              <Calendar className="h-5 w-5" /> {stats.activeSchedules}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Low/Critical Stock</CardTitle></CardHeader>
-            <CardContent className="text-3xl font-bold flex items-center gap-2">
-              <Package className="h-5 w-5" /> {stats.lowStockItems}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Staff On Duty</CardTitle></CardHeader>
-            <CardContent className="text-3xl font-bold flex items-center gap-2">
-              <Shield className="h-5 w-5" /> {stats.staffOnDuty}
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader><CardTitle>Quick Links</CardTitle></CardHeader>
-          <CardContent className="flex flex-wrap gap-3">
-            <Button asChild variant="secondary"><Link href="/dashboard/goshala-manager/cows">Cows & Herd</Link></Button>
-            <Button asChild variant="secondary"><Link href="/dashboard/goshala-manager/health">Health Records</Link></Button>
-            <Button asChild variant="secondary"><Link href="/dashboard/goshala-manager/food">Food Summary</Link></Button>
-            <Button asChild variant="secondary"><Link href="/dashboard/goshala-manager/finance">Finance</Link></Button>
-            <Button asChild variant="secondary"><Link href="/dashboard/goshala-manager/staff">Staff</Link></Button>
-            <Button asChild variant="secondary"><Link href="/dashboard/goshala-manager/infrastructure">Infrastructure</Link></Button>
-            <Button asChild variant="secondary"><Link href="/dashboard/goshala-manager/reports">Reports</Link></Button>
-            <Button asChild variant="secondary"><Link href="/dashboard/goshala-manager/alerts">Alerts</Link></Button>
-          </CardContent>
-        </Card>
+        <Button variant="outline" size="sm" onClick={() => fetchData(true)} disabled={refreshing}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
+
+      {/* Stats */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Total Cattle" value={stats.totalCattle} icon={Users} />
+        <StatCard title="Active Schedules" value={stats.activeSchedules} icon={Calendar} />
+        <StatCard title="Low Stock Items" value={stats.lowStockItems} icon={Package} />
+        <StatCard title="Staff On Duty" value={stats.staffOnDuty} icon={Shield} />
+      </div>
+
+      {/* Quick Links */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Quick Links</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <QuickLink href="/dashboard/goshala-manager/cows" icon={Users} label="Cows & Herd" />
+          <QuickLink href="/dashboard/goshala-manager/health" icon={Heart} label="Health Records" />
+          <QuickLink href="/dashboard/goshala-manager/food" icon={Package} label="Food Summary" />
+          <QuickLink href="/dashboard/goshala-manager/finance" icon={DollarSign} label="Finance" />
+          <QuickLink href="/dashboard/goshala-manager/staff" icon={Shield} label="Staff" />
+          <QuickLink href="/dashboard/goshala-manager/infrastructure" icon={Wrench} label="Infrastructure" />
+          <QuickLink href="/dashboard/goshala-manager/reports" icon={FileText} label="Reports" />
+          <QuickLink href="/dashboard/goshala-manager/alerts" icon={AlertTriangle} label="Alerts" />
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
-

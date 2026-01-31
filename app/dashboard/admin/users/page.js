@@ -1,42 +1,94 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Shield, 
+import {
+  Users,
+  Plus,
+  Edit,
+  Trash2,
   RefreshCw,
   Eye,
-  EyeOff,
-  UserCheck,
-  UserX
+  EyeOff
 } from 'lucide-react';
 
-export default function UserManagementPage() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [toast, setToast] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  
-  const [userForm, setUserForm] = useState({
+// Role color mapping
+const ROLE_COLORS = {
+  'Owner/Admin': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  'Goshala Manager': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  'Doctor': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  'Food Manager': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  'Watchman': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+};
+
+// Memoized user row
+const UserRow = memo(function UserRow({ user, onEdit, onDelete }) {
+  return (
+    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-9 h-9 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+          <Users className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <div className="min-w-0">
+          <div className="font-medium truncate">{user.userId}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {user.name || 'No name'} • {user.email || 'No email'}
+          </div>
+          <div className="flex items-center gap-1 mt-1">
+            <Badge className={ROLE_COLORS[user.role] || ROLE_COLORS['Watchman']} variant="secondary">
+              {user.role}
+            </Badge>
+            <Badge variant={user.isActive ? "default" : "destructive"} className="text-xs">
+              {user.isActive ? 'Active' : 'Inactive'}
+            </Badge>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="text-right text-xs text-muted-foreground hidden sm:block">
+          <div>Last: {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</div>
+        </div>
+        <Button size="icon" variant="ghost" onClick={() => onEdit(user)}>
+          <Edit className="h-4 w-4" />
+        </Button>
+        <Button size="icon" variant="ghost" onClick={() => onDelete(user)}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+});
+
+// Loading skeleton
+function LoadingSkeleton() {
+  return (
+    <div className="w-full max-w-7xl mx-auto space-y-4 p-6">
+      <div className="h-8 bg-muted rounded w-48 animate-pulse" />
+      <div className="h-16 bg-muted rounded animate-pulse" />
+      <div className="space-y-2">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-16 bg-muted rounded animate-pulse" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// User form dialog
+const UserFormDialog = memo(function UserFormDialog({
+  open,
+  onClose,
+  onSubmit,
+  title,
+  submitLabel,
+  initialData = null
+}) {
+  const [form, setForm] = useState({
     userId: '',
     password: '',
     role: 'Watchman',
@@ -45,51 +97,208 @@ export default function UserManagementPage() {
     phone: '',
     isActive: true
   });
+  const [showPassword, setShowPassword] = useState(false);
 
-  const getCSRF = () => {
-    try { const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); return m?decodeURIComponent(m[1]):''; } catch { return ''; }
+  useEffect(() => {
+    if (initialData) {
+      setForm({
+        userId: initialData.userId || '',
+        password: '',
+        role: initialData.role || 'Watchman',
+        name: initialData.name || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        isActive: initialData.isActive !== false
+      });
+    } else {
+      setForm({
+        userId: '',
+        password: '',
+        role: 'Watchman',
+        name: '',
+        email: '',
+        phone: '',
+        isActive: true
+      });
+    }
+  }, [initialData, open]);
+
+  const handleSubmit = () => {
+    onSubmit(form);
   };
 
-  // Ensure CSRF cookie is issued on page load
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium">User ID</label>
+              <Input
+                value={form.userId}
+                onChange={(e) => setForm(f => ({ ...f, userId: e.target.value }))}
+                placeholder="User ID"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Password</label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder={initialData ? 'Leave blank to keep' : 'Password'}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Role</label>
+            <Select value={form.role} onValueChange={(value) => setForm(f => ({ ...f, role: value }))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Watchman">Watchman</SelectItem>
+                <SelectItem value="Food Manager">Food Manager</SelectItem>
+                <SelectItem value="Goshala Manager">Goshala Manager</SelectItem>
+                <SelectItem value="Doctor">Doctor</SelectItem>
+                <SelectItem value="Owner/Admin">Owner/Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Name</label>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Full name"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="Email"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Phone</label>
+              <Input
+                value={form.phone}
+                onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))}
+                placeholder="Phone"
+              />
+            </div>
+          </div>
+          {initialData && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={form.isActive}
+                onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))}
+              />
+              <label htmlFor="isActive" className="text-sm">Active</label>
+            </div>
+          )}
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onClose(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!form.userId || (!initialData && !form.password)}>
+            {submitLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+export default function UserManagementPage() {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [toast, setToast] = useState('');
+
+  const mountedRef = useRef(true);
+  const searchTimeoutRef = useRef(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search
   useEffect(() => {
-    (async () => {
-      try {
-        await fetch('/api/csrf', { credentials: 'same-origin', cache: 'no-store' });
-      } catch {}
-    })();
+    clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(searchTimeoutRef.current);
+  }, [searchTerm]);
+
+  const getCSRF = () => {
+    try {
+      const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : '';
+    } catch { return ''; }
+  };
+
+  useEffect(() => {
+    fetch('/api/csrf', { credentials: 'same-origin' }).catch(() => { });
   }, []);
 
   const loadUsers = useCallback(async () => {
     try {
       setRefreshing(true);
-      const res = await fetch('/api/admin/users?limit=100', { cache: 'no-store' });
+      const res = await fetch('/api/admin/users?limit=100');
       const data = await res.json();
-      if (res.ok) {
+      if (mountedRef.current && res.ok) {
         setUsers(data.users || []);
-        setFilteredUsers(data.users || []);
       }
     } catch (error) {
       console.error('Failed to load users:', error);
-      setToast('Failed to load users');
     } finally {
-      setRefreshing(false);
-      setLoading(false);
+      if (mountedRef.current) {
+        setRefreshing(false);
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     loadUsers();
+    return () => { mountedRef.current = false; };
   }, [loadUsers]);
 
-  // Filter users based on search and filters
-  useEffect(() => {
+  // Memoized filtered users
+  const filteredUsers = useMemo(() => {
     let filtered = users;
 
-    if (searchTerm) {
-      filtered = filtered.filter(user => 
-        user.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    if (debouncedSearch) {
+      const search = debouncedSearch.toLowerCase();
+      filtered = filtered.filter(user =>
+        user.userId?.toLowerCase().includes(search) ||
+        user.name?.toLowerCase().includes(search) ||
+        user.email?.toLowerCase().includes(search)
       );
     }
 
@@ -98,52 +307,55 @@ export default function UserManagementPage() {
     }
 
     if (statusFilter && statusFilter !== 'all') {
-      filtered = filtered.filter(user => 
+      filtered = filtered.filter(user =>
         statusFilter === 'active' ? user.isActive : !user.isActive
       );
     }
 
-    setFilteredUsers(filtered);
-  }, [users, searchTerm, roleFilter, statusFilter]);
+    return filtered;
+  }, [users, debouncedSearch, roleFilter, statusFilter]);
 
-  const handleAddUser = async () => {
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
+
+  const handleAddUser = async (form) => {
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
         credentials: 'same-origin',
-        body: JSON.stringify(userForm)
+        body: JSON.stringify(form)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create user');
-      
-      setToast('User created successfully');
+      if (!res.ok) throw new Error(data.error || 'Failed');
+
+      showToast('User created successfully');
       setShowAddDialog(false);
-      setUserForm({ userId: '', password: '', role: 'Watchman', name: '', email: '', phone: '', isActive: true });
       loadUsers();
     } catch (error) {
-      setToast(`Failed to create user: ${error.message}`);
+      showToast(`Error: ${error.message}`);
     }
   };
 
-  const handleUpdateUser = async () => {
+  const handleUpdateUser = async (form) => {
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
         credentials: 'same-origin',
-        body: JSON.stringify({ id: selectedUser._id, ...userForm })
+        body: JSON.stringify({ id: selectedUser._id, ...form })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update user');
-      
-      setToast('User updated successfully');
+      if (!res.ok) throw new Error(data.error || 'Failed');
+
+      showToast('User updated successfully');
       setShowEditDialog(false);
       setSelectedUser(null);
-      setUserForm({ userId: '', password: '', role: 'Watchman', name: '', email: '', phone: '', isActive: true });
       loadUsers();
     } catch (error) {
-      setToast(`Failed to update user: ${error.message}`);
+      showToast(`Error: ${error.message}`);
     }
   };
 
@@ -156,397 +368,159 @@ export default function UserManagementPage() {
         body: JSON.stringify({ id: selectedUser._id })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to delete user');
-      
-      setToast('User deleted successfully');
+      if (!res.ok) throw new Error(data.error || 'Failed');
+
+      showToast('User deleted successfully');
       setShowDeleteDialog(false);
       setSelectedUser(null);
       loadUsers();
     } catch (error) {
-      setToast(`Failed to delete user: ${error.message}`);
+      showToast(`Error: ${error.message}`);
     }
   };
 
-  const handleEditUser = (user) => {
+  const handleEditUser = useCallback((user) => {
     setSelectedUser(user);
-    setUserForm({
-      userId: user.userId,
-      password: '', // Don't pre-fill password
-      role: user.role,
-      name: user.name || '',
-      email: user.email || '',
-      phone: user.phone || '',
-      isActive: user.isActive
-    });
     setShowEditDialog(true);
-  };
+  }, []);
 
-  const handleDeleteClick = (user) => {
+  const handleDeleteClick = useCallback((user) => {
     setSelectedUser(user);
     setShowDeleteDialog(true);
-  };
+  }, []);
 
-  const getRoleColor = (role) => {
-    switch(role) {
-      case 'Owner/Admin': return 'bg-purple-100 text-purple-800';
-      case 'Goshala Manager': return 'bg-blue-100 text-blue-800';
-      case 'Doctor': return 'bg-green-100 text-green-800';
-      case 'Food Manager': return 'bg-orange-100 text-orange-800';
-      case 'Watchman': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const clearFilters = useCallback(() => {
+    setSearchTerm('');
+    setRoleFilter('all');
+    setStatusFilter('all');
+  }, []);
 
-  const getStatusColor = (isActive) => {
-    return isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen w-full p-6">
-        <div className="w-full max-w-7xl mx-auto space-y-6">
-          <div className="h-8 bg-gray-200 rounded animate-pulse" />
-          <div className="h-96 bg-gray-200 rounded animate-pulse" />
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingSkeleton />;
 
   return (
-    <div className="min-h-screen w-full p-6">
-      <div className="w-full max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Users className="h-8 w-8" /> User Management
-            </h1>
-            <p className="text-muted-foreground">Manage system users and permissions</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" disabled={refreshing} onClick={loadUsers}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin':''}`} /> Refresh
-            </Button>
-            <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" /> Add User
-            </Button>
-          </div>
+    <div className="w-full max-w-7xl mx-auto space-y-4 p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Users className="h-6 w-6" /> User Management
+          </h1>
+          <p className="text-muted-foreground text-sm">Manage system users</p>
         </div>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Input
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="Owner/Admin">Owner/Admin</SelectItem>
-                  <SelectItem value="Goshala Manager">Goshala Manager</SelectItem>
-                  <SelectItem value="Doctor">Doctor</SelectItem>
-                  <SelectItem value="Food Manager">Food Manager</SelectItem>
-                  <SelectItem value="Watchman">Watchman</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setSearchTerm('');
-                  setRoleFilter('all');
-                  setStatusFilter('all');
-                }}
-              >
-                Clear Filters
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Users Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Users ({filteredUsers.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filteredUsers.length > 0 ? (
-              <div className="space-y-4">
-                {filteredUsers.map((user) => (
-                  <div key={user._id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                        <Users className="h-5 w-5 text-gray-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium">{user.userId}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {user.name || 'No name'} • {user.email || 'No email'}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge className={getRoleColor(user.role)}>{user.role}</Badge>
-                          <Badge className={getStatusColor(user.isActive)}>
-                            {user.isActive ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-right text-sm text-muted-foreground">
-                        <div>Last login: {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</div>
-                        <div>Created: {new Date(user.createdAt).toLocaleDateString()}</div>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline" onClick={() => handleEditUser(user)}>
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleDeleteClick(user)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <div>No users found</div>
-                <div className="text-xs">Try adjusting your filters or add a new user</div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Add User Dialog */}
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New User</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">User ID</label>
-                  <Input
-                    value={userForm.userId}
-                    onChange={(e) => setUserForm({...userForm, userId: e.target.value})}
-                    placeholder="Enter user ID"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Password</label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      value={userForm.password}
-                      onChange={(e) => setUserForm({...userForm, password: e.target.value})}
-                      placeholder="Enter password"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Role</label>
-                <Select value={userForm.role} onValueChange={(value) => setUserForm({...userForm, role: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Watchman">Watchman</SelectItem>
-                    <SelectItem value="Food Manager">Food Manager</SelectItem>
-                    <SelectItem value="Cow Manager">Cow Manager</SelectItem>
-                    <SelectItem value="Goshala Manager">Goshala Manager</SelectItem>
-                    <SelectItem value="Doctor">Doctor</SelectItem>
-                    <SelectItem value="Owner/Admin">Owner/Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Name</label>
-                <Input
-                  value={userForm.name}
-                  onChange={(e) => setUserForm({...userForm, name: e.target.value})}
-                  placeholder="Enter full name"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Email</label>
-                  <Input
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                    placeholder="Enter email"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Phone</label>
-                  <Input
-                    value={userForm.phone}
-                    onChange={(e) => setUserForm({...userForm, phone: e.target.value})}
-                    placeholder="Enter phone number"
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddUser} disabled={!userForm.userId || !userForm.password}>
-                Add User
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit User Dialog */}
-        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">User ID</label>
-                  <Input
-                    value={userForm.userId}
-                    onChange={(e) => setUserForm({...userForm, userId: e.target.value})}
-                    placeholder="Enter user ID"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Password (leave blank to keep current)</label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      value={userForm.password}
-                      onChange={(e) => setUserForm({...userForm, password: e.target.value})}
-                      placeholder="Enter new password"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Role</label>
-                <Select value={userForm.role} onValueChange={(value) => setUserForm({...userForm, role: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Watchman">Watchman</SelectItem>
-                    <SelectItem value="Food Manager">Food Manager</SelectItem>
-                    <SelectItem value="Goshala Manager">Goshala Manager</SelectItem>
-                    <SelectItem value="Doctor">Doctor</SelectItem>
-                    <SelectItem value="Owner/Admin">Owner/Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Name</label>
-                <Input
-                  value={userForm.name}
-                  onChange={(e) => setUserForm({...userForm, name: e.target.value})}
-                  placeholder="Enter full name"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Email</label>
-                  <Input
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                    placeholder="Enter email"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Phone</label>
-                  <Input
-                    value={userForm.phone}
-                    onChange={(e) => setUserForm({...userForm, phone: e.target.value})}
-                    placeholder="Enter phone number"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={Boolean(userForm.isActive)}
-                  onChange={(e) => setUserForm({...userForm, isActive: e.target.checked})}
-                />
-                <label htmlFor="isActive" className="text-sm font-medium">Active</label>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
-              <Button onClick={handleUpdateUser} disabled={!userForm.userId}>
-                Update User
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete User Dialog */}
-        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete User</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <p>Are you sure you want to delete user <strong>{selectedUser?.userId}</strong>?</p>
-              <p className="text-sm text-muted-foreground mt-2">This action cannot be undone.</p>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDeleteUser}>Delete User</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {toast && (
-          <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg">
-            {toast}
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={refreshing} onClick={loadUsers}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => setShowAddDialog(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add User
+          </Button>
+        </div>
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Roles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="Owner/Admin">Owner/Admin</SelectItem>
+                <SelectItem value="Goshala Manager">Goshala Manager</SelectItem>
+                <SelectItem value="Doctor">Doctor</SelectItem>
+                <SelectItem value="Food Manager">Food Manager</SelectItem>
+                <SelectItem value="Watchman">Watchman</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={clearFilters}>Clear</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Users List */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Users ({filteredUsers.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredUsers.length > 0 ? (
+            <div className="space-y-2">
+              {filteredUsers.map(user => (
+                <UserRow
+                  key={user._id}
+                  user={user}
+                  onEdit={handleEditUser}
+                  onDelete={handleDeleteClick}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <div>No users found</div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add Dialog */}
+      <UserFormDialog
+        open={showAddDialog}
+        onClose={setShowAddDialog}
+        onSubmit={handleAddUser}
+        title="Add New User"
+        submitLabel="Add User"
+      />
+
+      {/* Edit Dialog */}
+      <UserFormDialog
+        open={showEditDialog}
+        onClose={setShowEditDialog}
+        onSubmit={handleUpdateUser}
+        title="Edit User"
+        submitLabel="Update User"
+        initialData={selectedUser}
+      />
+
+      {/* Delete Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+          </DialogHeader>
+          <p>Delete user <strong>{selectedUser?.userId}</strong>?</p>
+          <p className="text-sm text-muted-foreground">This cannot be undone.</p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteUser}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg z-50 animate-in fade-in slide-in-from-bottom-4">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

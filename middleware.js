@@ -20,7 +20,7 @@ const COMPRESSIBLE_TYPES = [
 function shouldCompress(response) {
   const contentType = response.headers.get('content-type');
   if (!contentType) return false;
-  
+
   // Check if content type is compressible
   const isCompressible = COMPRESSIBLE_TYPES.some(type => contentType.includes(type));
   if (!isCompressible) return false;
@@ -37,7 +37,7 @@ export async function middleware(req) {
   const { pathname, search } = req.nextUrl;
   const isApi = pathname.startsWith("/api/");
   const isDev = process.env.NODE_ENV !== 'production';
-  const CSP = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'";
+  const CSP = "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'";
 
   // Allow auth, CSRF, test, and seed routes to pass through
   if (pathname.startsWith("/api/auth") || pathname === "/api/csrf" || pathname === "/api/test-redis" || pathname === "/api/test-auth" || pathname === "/api/test-env" || pathname.startsWith("/api/seed/")) {
@@ -56,8 +56,9 @@ export async function middleware(req) {
       if (!isDev) res.headers.set('Content-Security-Policy', CSP);
       return res;
     }
+    // Redirect unauthenticated users to login page (not homepage)
     const url = req.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/login";
     const next = encodeURIComponent(`${pathname}${search || ""}`);
     url.search = next ? `?next=${next}` : "";
     const res = NextResponse.redirect(url);
@@ -77,12 +78,12 @@ export async function middleware(req) {
     const SHORT_MS = 12 * 60 * 60 * 1000; // 12 hours
     if (!remember && loginAt && now - loginAt > SHORT_MS) {
       const url = req.nextUrl.clone();
-      url.pathname = "/";
+      url.pathname = "/login";
       const next = encodeURIComponent(`${pathname}${search || ""}`);
       url.search = next ? `?next=${next}` : "";
       return NextResponse.redirect(url);
     }
-  } catch {}
+  } catch { }
 
   // Role-based routing and authorization for /dashboard and /api
   try {
@@ -121,10 +122,10 @@ export async function middleware(req) {
         return res;
       }
     }
-  } catch {}
+  } catch { }
 
   const res = NextResponse.next();
-  
+
   // Baseline security headers for all responses
   res.headers.set('X-Frame-Options', 'DENY');
   res.headers.set('X-Content-Type-Options', 'nosniff');
