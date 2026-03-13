@@ -115,6 +115,10 @@ export default function InventoryPage() {
 
   const handleEditSubmit = async (formData) => {
     try {
+      // Get CSRF token
+      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const { token } = await csrfRes.json();
+
       const payload = { ...formData };
       if (payload.quantity !== undefined && payload.quantity !== null && payload.quantity !== '') {
         const q = typeof payload.quantity === 'string' ? parseFloat(payload.quantity) : payload.quantity;
@@ -139,10 +143,10 @@ export default function InventoryPage() {
       });
       const response = await fetch('/api/food/inventory', {
         method: 'PATCH',
-        headers: addCSRFHeader({
+       headers: {
           'Content-Type': 'application/json',
-          method: 'PATCH'
-        }),
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        },
         credentials: 'same-origin',
         body: JSON.stringify({ id: selectedItem._id, ...payload })
       });
@@ -165,14 +169,17 @@ export default function InventoryPage() {
 
   const handleDeleteConfirm = async () => {
     try {
+            // Get CSRF token
+      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const { token } = await csrfRes.json();
       const response = await fetch(`/api/food/inventory?id=${selectedItem._id}`, {
         method: 'DELETE',
-        headers: addCSRFHeader({
+       headers: {
           'Content-Type': 'application/json',
-          method: 'DELETE'
-        }),
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        },
         credentials: 'same-origin',
-        body: JSON.stringify({})
+        body: JSON.stringify(),
       });
 
       const data = await response.json();

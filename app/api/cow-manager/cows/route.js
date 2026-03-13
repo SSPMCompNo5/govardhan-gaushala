@@ -9,11 +9,11 @@ import { validateCSRFFromRequest } from '@/lib/csrf';
 const limitWrite = rateLimit({ windowMs: 60 * 1000, max: 20 });
 
 function canRead(role) {
-  return ['Cow Manager','Goshala Manager','Doctor','Admin','Owner/Admin'].includes(role);
+  return ['Cow Manager', 'Goshala Manager', 'Doctor', 'Admin', 'Owner/Admin'].includes(role);
 }
 
 function canWrite(role) {
-  return ['Cow Manager','Goshala Manager','Owner/Admin','Admin'].includes(role);
+  return ['Cow Manager', 'Goshala Manager', 'Owner/Admin', 'Admin'].includes(role);
 }
 
 // GET /api/cow-manager/cows - list cows with filters

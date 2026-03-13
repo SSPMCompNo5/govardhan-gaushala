@@ -38,6 +38,10 @@ export default function AddCowPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
+        // Get CSRF token
+      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const { token } = await csrfRes.json();
+
       const payload = {
         ...form,
         status: form.health === 'healthy' ? 'normal' : 'sick',
@@ -48,7 +52,10 @@ export default function AddCowPage() {
       delete payload.health;
       const res = await fetch('/api/cow-manager/cows', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        },
         credentials: 'same-origin',
         body: JSON.stringify(payload)
       });
@@ -60,6 +67,29 @@ export default function AddCowPage() {
     } finally {
       setSubmitting(false);
     }
+    try {
+      // Get CSRF token
+      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const { token } = await csrfRes.json();
+      const res = await fetch('/api/goshala-manager/cows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(form)
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || 'Failed');
+      showToast('Cow added successfully');
+      setForm({ tagId: '', name: '', category: 'adult', status: 'healthy', breed: '', age: '', weight: '', dailyMilkYield: '', notes: '' });
+      setShowAddForm(false);
+      load();
+    } 
+    catch (e) {
+      showToast(String(e.message || e));
+    }
   };
 
   const onUpload = async (file) => {
@@ -68,7 +98,10 @@ export default function AddCowPage() {
       const form = new FormData();
       form.append('file', file);
       form.append('tagId', form.tagId || '');
-      const res = await fetch('/api/cow-manager/uploads', { method: 'POST', body: form, credentials: 'same-origin' });
+      const res = await fetch('/api/cow-manager/uploads', { method: 'POST',headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        }, body: form, credentials: 'same-origin' });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Upload failed');
       setForm(f => ({ ...f, photoUrl: data.url }));

@@ -129,98 +129,50 @@ export default function AdminDashboard() {
   // Use ref to track if component is mounted
   const mountedRef = useRef(true);
 
-  // Cache results to avoid re-fetching
-  const cacheRef = useRef({ data: null, timestamp: 0 });
-  const CACHE_TTL = 30000; // 30 seconds
+  // Update cache logic - removed local ref
 
   const fetchDashboardData = useCallback(async (force = false) => {
-    // Check cache first (unless forced refresh)
-    const now = Date.now();
-    if (!force && cacheRef.current.data && (now - cacheRef.current.timestamp) < CACHE_TTL) {
-      return;
-    }
-
     try {
       setRefreshing(true);
 
-      // Use Promise.allSettled for resilience
       const fetchJson = async (url) => {
         try {
-          const res = await fetch(url);
+          const res = await fetch(url, { cache: 'no-store' }); // Ensure fresh data
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return await res.json();
         } catch (e) {
           console.warn(`Failed to fetch ${url}:`, e);
-          return {};
+          return null;
         }
       };
 
-      const results = await Promise.allSettled([
-        fetchJson('/api/admin/users?limit=50'),
-        fetchJson('/api/goshala-manager/cows?limit=50'),
-        fetchJson('/api/food/inventory?limit=50'),
-        fetchJson('/api/gate-logs?pageSize=10'),
-        fetchJson('/api/goshala-manager/alerts/summary'),
-        fetchJson('/api/admin/activity?limit=5')
-      ]);
+      // Fetch aggregated stats from single optimized endpoint
+      const dashboardData = await fetchJson('/api/admin/dashboard/stats');
 
       if (!mountedRef.current) return;
 
-      // Extract data with fallbacks
-      const [usersResult, cattleResult, inventoryResult, gateLogsResult, alertsResult, activityResult] = results;
+      if (dashboardData && dashboardData.stats) {
+        setStats(dashboardData.stats);
+        setRecentActivity(dashboardData.recentActivity || []);
+        setSystemAlerts(dashboardData.systemAlerts || []);
+      }
 
-      const usersData = usersResult.status === 'fulfilled' ? usersResult.value : { users: [] };
-      const cattleData = cattleResult.status === 'fulfilled' ? cattleResult.value : { cows: [] };
-      const inventoryData = inventoryResult.status === 'fulfilled' ? inventoryResult.value : { inventory: [] };
-      const gateLogsData = gateLogsResult.status === 'fulfilled' ? gateLogsResult.value : { logs: [] };
-      const alertsData = alertsResult.status === 'fulfilled' ? alertsResult.value : {};
-      const activityData = activityResult.status === 'fulfilled' ? activityResult.value : { activities: [] };
+      // Stop here - data is already set
+      setRefreshing(false);
+      setLoading(false);
+      return;
 
-      // Calculate stats
-      const totalUsers = usersData.users?.length || 0;
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      const activeUsers = usersData.users?.filter(u =>
-        u.lastLogin && new Date(u.lastLogin).getTime() > sevenDaysAgo
-      ).length || 0;
 
-      const today = new Date().toISOString().split('T')[0];
-      const todayLogs = gateLogsData.logs?.filter(log => log.at?.startsWith(today)) || [];
+      // Legacy calculation logic removed - handled by API
 
-      const criticalAlerts = (alertsData.critical?.length || 0) + (alertsData.low?.length || 0);
 
-      setStats({
-        totalUsers,
-        activeUsers,
-        totalCattle: cattleData.cows?.length || 0,
-        totalInventory: inventoryData.inventory?.length || 0,
-        lowStockItems: inventoryData.inventory?.filter(i => i.status === 'low' || i.status === 'critical').length || 0,
-        criticalAlerts,
-        todayEntries: todayLogs.filter(log => log.type === 'entry').length,
-        todayExits: todayLogs.filter(log => log.type === 'exit').length,
-        systemHealth: criticalAlerts > 5 ? 'warning' : 'healthy',
-        lastBackup: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      });
 
-      // Process activity - limit to 5 items
-      const activities = (activityData.activities || []).slice(0, 5).map((a, i) => ({
-        id: a.id || a._id || i,
-        message: a.message || a.action || 'Activity',
-        user: a.user || a.actor || 'System',
-        time: a.timestamp ? new Date(a.timestamp).toLocaleString() : '-',
-        severity: a.severity || 'info'
-      }));
-      setRecentActivity(activities);
+      // Legacy processing removed
 
-      // Process alerts - limit to 5 items
-      const alerts = [
-        ...(alertsData.critical || []).map(a => ({ ...a, type: 'critical' })),
-        ...(alertsData.low || []).map(a => ({ ...a, type: 'warning' })),
-        ...(alertsData.upcoming || []).map(a => ({ ...a, type: 'info' }))
-      ].slice(0, 5);
-      setSystemAlerts(alerts);
 
-      // Update cache
-      cacheRef.current = { data: true, timestamp: Date.now() };
+
+      // Cache update removed
+
 
     } catch (error) {
       console.error('Dashboard fetch error:', error);

@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable standalone output for Docker
-  output: 'standalone',
+  // Enable standalone output for Docker (disabled for local dev)
+  // output: 'standalone',
   
   // Optimize for production
   serverExternalPackages: ['mongodb'],

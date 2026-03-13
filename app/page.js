@@ -577,7 +577,7 @@ const TestimonialsSection = memo(function TestimonialsSection() {
                   <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
                 ))}
               </div>
-              <p className="text-gray-600 dark:text-gray-300 italic mb-4">"{t.quote}"</p>
+              <p className="text-gray-600 dark:text-gray-300 italic mb-4">{t.quote}</p>
               <div>
                 <p className="font-semibold text-gray-900 dark:text-white">{t.name}</p>
                 <p className="text-sm text-emerald-600">{t.role}</p>
@@ -665,6 +665,7 @@ const ContactSection = memo(function ContactSection() {
     </section>
   );
 });
+
 
 // Footer - Simplified
 function Footer() {

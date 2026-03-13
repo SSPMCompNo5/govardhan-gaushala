@@ -70,12 +70,17 @@ export default function AddSchedulePage() {
     }
 
     try {
+         // Get CSRF token
+      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const { token } = await csrfRes.json();
+
       setLoading(true);
 
       const response = await fetch('/api/food/schedule', {
         method: 'POST',
-        headers: {
+     headers: {
           'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': token } : {})
         },
         body: JSON.stringify({
           ...formData,

@@ -269,7 +269,7 @@ export default function UserManagementPage() {
   const loadUsers = useCallback(async () => {
     try {
       setRefreshing(true);
-      const res = await fetch('/api/admin/users?limit=100');
+      const res = await fetch('/api/admin/users?limit=5');
       const data = await res.json();
       if (mountedRef.current && res.ok) {
         setUsers(data.users || []);

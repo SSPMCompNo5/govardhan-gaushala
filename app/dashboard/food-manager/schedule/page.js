@@ -44,6 +44,7 @@ export default function SchedulePage() {
   // Fetch schedules
   const fetchSchedules = useCallback(async (page = 1) => {
     try {
+      
       setRefreshing(true);
       
       const params = new URLSearchParams({

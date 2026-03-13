@@ -128,9 +128,14 @@ export default function CowsPage() {
 
   const onCreate = async () => {
     try {
+            const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const { token } = await csrfRes.json();
       const res = await fetch('/api/goshala-manager/cows', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+         headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        },        
         credentials: 'same-origin',
         body: JSON.stringify(form)
       });

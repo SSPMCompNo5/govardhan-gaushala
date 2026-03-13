@@ -13,7 +13,7 @@ export async function GET(request) {
     }
     const { searchParams } = new URL(request.url);
     const q = (searchParams.get('q') || '').trim();
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 200);
+    // const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 200);
     const sortByRaw = (searchParams.get('sortBy') || 'createdAt');
     const sortDirRaw = (searchParams.get('sortDir') || 'desc');
     const allowedSort = new Set(['createdAt', 'userId', 'role']);
@@ -35,7 +35,7 @@ export async function GET(request) {
     const data = await users
       .find(filter, { projection: { passwordHash: 0 } })
       .sort({ [sortBy]: sortDir })
-      .limit(limit)
+      // .limit(limit)
       .toArray();
 
     return NextResponse.json({ ok: true, users: data });

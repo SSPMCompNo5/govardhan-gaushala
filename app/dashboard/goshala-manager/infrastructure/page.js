@@ -81,8 +81,14 @@ export default function InfrastructurePage() {
 
   const onAddAsset = async () => {
     try {
+      // Get CSRF token
+      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const { token } = await csrfRes.json();
       const res = await fetch('/api/goshala-manager/infrastructure/assets', {
-        method: 'POST', headers: addCSRFHeader({ 'Content-Type': 'application/json' }), 
+        method: 'POST', headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        }, 
         credentials: 'same-origin', body: JSON.stringify(assetForm)
       });
       const j = await res.json();
