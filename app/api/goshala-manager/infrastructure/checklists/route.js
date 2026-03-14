@@ -11,7 +11,8 @@ const limitWrite = rateLimit({ windowMs: 60 * 1000, max: 20 });
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.role !== 'Goshala Manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const ALLOWED_ROLES = ['Goshala Manager', 'Admin', 'Owner/Admin'];
+    if (!session || !ALLOWED_ROLES.includes(session.user?.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date');
     const client = await clientPromise;
@@ -34,7 +35,8 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.role !== 'Goshala Manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const ALLOWED_ROLES = ['Goshala Manager', 'Admin', 'Owner/Admin'];
+    if (!session || !ALLOWED_ROLES.includes(session.user?.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     const k = rateLimitKeyFromRequest(request, session.user?.userId);
     const r = await limitWrite(k);
     if (r.limited) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });

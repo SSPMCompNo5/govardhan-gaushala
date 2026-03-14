@@ -59,37 +59,48 @@ export default function AddSupplierPage() {
     }));
   };
 
+  const fetchCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.name || !formData.contactPerson || !formData.phone) {
-      // Validation error - will be handled by form validation
       return;
     }
 
     try {
       setLoading(true);
+      const token = await fetchCSRF();
 
       const response = await fetch('/api/food/suppliers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-CSRF-Token': token
         },
+        credentials: 'same-origin',
         body: JSON.stringify(formData),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Success - redirect to suppliers page
         router.push('/dashboard/food-manager/suppliers');
       } else {
         console.error('Error adding supplier:', data.error);
-        // Error will be handled by toast system
+        alert(data.error || 'Failed to add supplier');
       }
     } catch (error) {
       console.error('Error adding supplier:', error);
-      // Error will be handled by toast system
+      alert('An error occurred while adding supplier');
     } finally {
       setLoading(false);
     }

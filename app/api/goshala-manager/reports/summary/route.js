@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import clientPromise from '@/lib/mongo';
+import { stringify } from 'csv-stringify/sync';
 
 function rangeFor(period) {
   const now = new Date();
@@ -26,9 +27,12 @@ function rangeFor(period) {
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.role !== 'Goshala Manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!session || !['Goshala Manager', 'Admin', 'Owner/Admin'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'monthly';
+    const format = searchParams.get('format') || 'json';
     const { start, end } = rangeFor(period);
 
     const client = await clientPromise;
@@ -80,6 +84,43 @@ export async function GET(request) {
     const expensesByCategory = Object.fromEntries(expenses.map(e => [e._id, e.amount]));
     const totalExpenses = Object.values(expensesByCategory).reduce((a,b)=>a+b,0);
     const totalDonations = donations[0]?.amount || 0;
+
+    if (format === 'csv') {
+      const data = [
+        ['Goshala Summary Report', ''],
+        ['Period', period],
+        ['Range', `${start.toLocaleDateString()} to ${end.toLocaleDateString()}`],
+        [''],
+        ['Herd Summary', ''],
+        ['Category', 'Count'],
+        ...Object.entries(herd),
+        [''],
+        ['Production & Consumption', ''],
+        ['Metric', 'Value'],
+        ['Total Milk Yield', `${totalMilk}L`],
+        ['Total Consumption', totalConsumption],
+        [''],
+        ['Inventory Status', ''],
+        ['Status', 'Count'],
+        ['Healthy', stock.healthy],
+        ['Low', stock.low],
+        ['Critical', stock.critical],
+        [''],
+        ['Financial Summary', ''],
+        ['Category', 'Amount'],
+        ...Object.entries(expensesByCategory).map(([k, v]) => [`Expense: ${k}`, v]),
+        ['Total Expenses', totalExpenses],
+        ['Total Donations', totalDonations],
+        ['Net Balance', totalDonations - totalExpenses]
+      ];
+      const csv = stringify(data);
+      return new NextResponse(csv, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="goshala_summary_${period}.csv"`
+        }
+      });
+    }
 
     return NextResponse.json({ period, range: { start, end }, herd, totalMilk, totalConsumption, stock, upcomingVacc, activeTreat, expensesByCategory, totalExpenses, totalDonations });
   } catch (e) {

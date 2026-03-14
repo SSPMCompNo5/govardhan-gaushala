@@ -13,7 +13,7 @@ export async function GET(request) {
   try {
     const session = await getServerSession(authOptions);
     const role = session?.user?.role;
-    if (!session || !['Goshala Manager','Cow Manager','Doctor','Admin','Owner/Admin'].includes(role)) {
+    if (!session || !['Goshala Manager','Cow Manager','Doctor','Admin','Owner/Admin','Food Manager','Watchman'].includes(role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     const { searchParams } = new URL(request.url);
@@ -51,7 +51,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.role !== 'Goshala Manager') {
+    if (!session || !['Goshala Manager', 'Admin', 'Owner/Admin'].includes(session.user?.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     const k = rateLimitKeyFromRequest(request, session.user?.userId);
@@ -82,7 +82,7 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.role !== 'Goshala Manager') {
+    if (!session || !['Goshala Manager', 'Admin', 'Owner/Admin'].includes(session.user?.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     const k = rateLimitKeyFromRequest(request, session.user?.userId);

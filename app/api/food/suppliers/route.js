@@ -6,7 +6,7 @@ import { logAudit } from '@/lib/audit';
 import { ObjectId } from 'mongodb';
 import { rateLimit, rateLimitKeyFromRequest } from '@/lib/rateLimit';
 import { validateCSRFFromRequest } from '@/lib/csrf';
-import { withCache } from '@/lib/apiCache';
+import { withCache, clearCachedResponse } from '@/lib/apiCache';
 
 const limitPOST = rateLimit({ windowMs: 60 * 1000, max: 10 }); // 10/min per IP per path
 const limitMutation = rateLimit({ windowMs: 60 * 1000, max: 20 }); // shared for PATCH/DELETE
@@ -47,9 +47,15 @@ export async function GET(request) {
           .limit(limit)
           .project({
             name: 1,
-            contact: 1,
+            contactPerson: 1,
+            phone: 1,
+            email: 1,
             address: 1,
+            foodTypes: 1,
+            rating: 1,
+            isActive: 1,
             notes: 1,
+            lastOrderDate: 1,
             createdAt: 1,
             updatedAt: 1
           })
@@ -96,8 +102,13 @@ export async function POST(request) {
     const raw = await request.json();
     const data = {
       name: raw.name?.trim(),
-      contact: raw.contact?.trim(),
+      contactPerson: raw.contactPerson?.trim(),
+      phone: raw.phone?.trim(),
+      email: raw.email?.trim(),
       address: raw.address?.trim(),
+      foodTypes: Array.isArray(raw.foodTypes) ? raw.foodTypes : [],
+      rating: Number(raw.rating) || 5,
+      isActive: raw.isActive !== undefined ? !!raw.isActive : true,
       notes: raw.notes?.trim(),
       createdAt: new Date(),
       updatedAt: new Date()
@@ -170,8 +181,13 @@ export async function PATCH(request) {
     const raw = await request.json();
     const data = {
       name: raw.name?.trim(),
-      contact: raw.contact?.trim(),
+      contactPerson: raw.contactPerson?.trim(),
+      phone: raw.phone?.trim(),
+      email: raw.email?.trim(),
       address: raw.address?.trim(),
+      foodTypes: Array.isArray(raw.foodTypes) ? raw.foodTypes : (raw.foodTypes !== undefined ? [] : undefined),
+      rating: raw.rating !== undefined ? Number(raw.rating) : undefined,
+      isActive: raw.isActive !== undefined ? !!raw.isActive : undefined,
       notes: raw.notes?.trim(),
       updatedAt: new Date()
     };

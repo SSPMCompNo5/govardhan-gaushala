@@ -97,9 +97,10 @@ export default function DataManagementPage() {
 
       const response = await fetch('/api/admin/export', {
         method: 'POST',
-        headers: addCSRFHeader({
-          'Content-Type': 'application/json'
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
         credentials: 'same-origin',
         body: JSON.stringify({
           collections: selectedCollections.length > 0 ? selectedCollections : undefined,

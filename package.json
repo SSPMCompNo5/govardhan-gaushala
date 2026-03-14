@@ -43,6 +43,7 @@
     "next-auth": "^4.24.11",
     "nodemailer": "^6.9.13",
     "pdf-lib": "^1.17.1",
+    "razorpay": "^2.9.6",
     "react": "19.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-day-picker": "^9.9.0",

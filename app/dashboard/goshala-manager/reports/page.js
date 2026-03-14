@@ -29,10 +29,8 @@ export default function ReportsPage() {
 
   const exportReport = async (format) => {
     try {
-      const res = await fetch(`/api/goshala-manager/reports/export?period=${period}&format=${format}`, {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)?.[1] || '' },
-        credentials: 'same-origin'
+      const res = await fetch(`/api/goshala-manager/reports/summary?period=${period}&format=${format}`, {
+        cache: 'no-store'
       });
       if (res.ok) {
         const blob = await res.blob();

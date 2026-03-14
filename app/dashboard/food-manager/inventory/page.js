@@ -59,6 +59,16 @@ export default function InventoryPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
+  const fetchCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
+  };
+
   // Fetch inventory data
   const fetchInventory = useCallback(async () => {
     try {
@@ -115,9 +125,7 @@ export default function InventoryPage() {
 
   const handleEditSubmit = async (formData) => {
     try {
-      // Get CSRF token
-      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
-      const { token } = await csrfRes.json();
+      const token = await fetchCSRF();
 
       const payload = { ...formData };
       if (payload.quantity !== undefined && payload.quantity !== null && payload.quantity !== '') {
@@ -169,9 +177,7 @@ export default function InventoryPage() {
 
   const handleDeleteConfirm = async () => {
     try {
-            // Get CSRF token
-      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
-      const { token } = await csrfRes.json();
+      const token = await fetchCSRF();
       const response = await fetch(`/api/food/inventory?id=${selectedItem._id}`, {
         method: 'DELETE',
        headers: {
@@ -703,10 +709,14 @@ function BulkUpload({ onUploaded }) {
 		return rows;
 	};
 
-	const getCsrfToken = () => {
-		if (typeof document === 'undefined') return '';
-		const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
-		return m ? decodeURIComponent(m[1]) : '';
+	const fetchCSRF = async () => {
+		try {
+			const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+			const data = await res.json();
+			return data.token;
+		} catch {
+			return '';
+		}
 	};
 
 	const onFileChange = async (e) => {
@@ -721,12 +731,14 @@ function BulkUpload({ onUploaded }) {
 				setError('No valid rows found in CSV');
 				return;
 			}
+			const token = await fetchCSRF();
 			const res = await fetch('/api/food/inventory/bulk', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'X-CSRF-Token': getCsrfToken()
+					'X-CSRF-Token': token
 				},
+				credentials: 'same-origin',
 				body: JSON.stringify(rows)
 			});
 			const data = await res.json();

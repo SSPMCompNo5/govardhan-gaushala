@@ -70,8 +70,14 @@ export default function DoctorVaccinationsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const getCSRF = () => {
-    try { const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); return m?decodeURIComponent(m[1]):''; } catch { return ''; }
+  const fetchCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
   };
 
   const onRecordVaccination = async () => {
@@ -80,8 +86,9 @@ export default function DoctorVaccinationsPage() {
       const optimistic = { _id: tempId, tagId: form.tagId, vaccine: form.vaccine, scheduledAt: form.scheduledAt || new Date().toISOString(), notes: form.notes, nextDueDate: form.nextDueDate };
       setVaccinations(prev => [optimistic, ...prev]);
       const payload = { ...form, scheduledAt: form.scheduledAt || new Date().toISOString() };
+      const token = await fetchCSRF();
       const res = await fetch('/api/goshala-manager/health/vaccinations', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() }, credentials: 'same-origin',
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, credentials: 'same-origin',
         body: JSON.stringify(payload)
       });
       const j = await res.json();

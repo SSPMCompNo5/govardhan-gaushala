@@ -32,7 +32,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !['Goshala Manager','Admin','Owner/Admin'].includes(session.user?.role)) {
+    if (!session || !['Goshala Manager', 'Doctor', 'Admin', 'Owner/Admin'].includes(session.user?.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     const k = rateLimitKeyFromRequest(request, session.user?.userId);

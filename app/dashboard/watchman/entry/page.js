@@ -258,7 +258,7 @@ export default function EntryPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading} onClick={() => router.push('/dashboard/watchman')}>
+                <Button type="submit" disabled={loading}>
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -266,7 +266,6 @@ export default function EntryPage() {
                     </>
                   ) : (
                     'Record Entry'
-                    
                   )}
                 </Button>
               </div>

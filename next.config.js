@@ -8,8 +8,8 @@ const nextConfig = {
   
   // Image optimization
   images: {
-    domains: ['localhost'],
-    unoptimized: process.env.NODE_ENV === 'development',
+    domains: ['localhost', 'govardhangoushalakokan.com', 'images.unsplash.com'],
+    unoptimized: true,
   },
   
   // Environment variables

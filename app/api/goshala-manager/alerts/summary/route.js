@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     const role = session?.user?.role;
-    if (!session || !['Goshala Manager','Admin','Owner/Admin','Doctor'].includes(role)) {
+    if (!session || !['Goshala Manager','Admin','Owner/Admin','Doctor','Food Manager','Watchman'].includes(role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     const client = await clientPromise;

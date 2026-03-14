@@ -49,8 +49,14 @@ export default function EditCowPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const getCSRF = () => {
-    try { const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); return m?decodeURIComponent(m[1]):''; } catch { return ''; }
+  const fetchCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
   };
 
   const onSave = async () => {
@@ -71,9 +77,10 @@ export default function EditCowPage() {
         notes: form.notes || undefined,
         tags: form.tags ? form.tags.split(',').map(s => s.trim()).filter(Boolean) : []
       };
+      const token = await fetchCSRF();
       const res = await fetch('/api/goshala-manager/cows', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
         credentials: 'same-origin',
         body: JSON.stringify(payload)
       });
@@ -90,10 +97,16 @@ export default function EditCowPage() {
   const onUpload = async (file) => {
     if (!file) return;
     try {
+      const token = await fetchCSRF();
       const fd = new FormData();
       fd.append('file', file);
       fd.append('tagId', form.tagId || '');
-      const res = await fetch('/api/cow-manager/uploads', { method: 'POST', body: fd, credentials: 'same-origin' });
+      const res = await fetch('/api/cow-manager/uploads', { 
+        method: 'POST', 
+        headers: { 'X-CSRF-Token': token },
+        body: fd, 
+        credentials: 'same-origin' 
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Upload failed');
       setForm(f => ({ ...f, photoUrl: data.url }));

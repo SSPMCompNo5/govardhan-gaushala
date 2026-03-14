@@ -49,12 +49,13 @@ export async function GET(request) {
           .skip(skip)
           .limit(limit)
           .project({
-            name: 1,
             cowGroup: 1,
             foodType: 1,
             quantity: 1,
             unit: 1,
-            feedingTime: 1,
+            time: 1,
+            daysOfWeek: 1,
+            isActive: 1,
             notes: 1,
             createdAt: 1,
             updatedAt: 1
@@ -101,12 +102,13 @@ export async function POST(request) {
 
     const raw = await request.json();
     const data = {
-      name: raw.name?.trim(),
       cowGroup: raw.cowGroup,
       foodType: raw.foodType,
       quantity: parseFloat(raw.quantity),
       unit: raw.unit,
-      feedingTime: new Date(raw.feedingTime),
+      time: raw.time,
+      daysOfWeek: Array.isArray(raw.daysOfWeek) ? raw.daysOfWeek : [],
+      isActive: raw.isActive !== undefined ? !!raw.isActive : true,
       notes: raw.notes?.trim(),
       createdAt: new Date(),
       updatedAt: new Date()
@@ -178,12 +180,13 @@ export async function PATCH(request) {
 
     const raw = await request.json();
     const data = {
-      name: raw.name?.trim(),
       cowGroup: raw.cowGroup,
       foodType: raw.foodType,
       quantity: raw.quantity ? parseFloat(raw.quantity) : undefined,
       unit: raw.unit,
-      feedingTime: raw.feedingTime ? new Date(raw.feedingTime) : undefined,
+      time: raw.time,
+      daysOfWeek: Array.isArray(raw.daysOfWeek) ? raw.daysOfWeek : undefined,
+      isActive: raw.isActive !== undefined ? !!raw.isActive : undefined,
       notes: raw.notes?.trim(),
       updatedAt: new Date()
     };

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import clientPromise from '@/lib/mongo';
+import { stringify } from 'csv-stringify/sync';
 
 export async function POST(request) {
   try {
@@ -106,9 +107,105 @@ export async function POST(request) {
       doctor: { treatments: treatmentsSummary },
     };
 
+    if (config?.format === 'csv') {
+      const data = [
+        ['Goshala Admin Report', ''],
+        ['Generated', reportData.metadata.generatedAt],
+        [''],
+        ['Gate Totals', ''],
+        ['Metric', 'Value'],
+        ...Object.entries(gateTotals),
+        [''],
+        ['Inventory Summary', ''],
+        ['Metric', 'Value'],
+        ...Object.entries(foodInventory[0] || {}),
+        [''],
+        ['Cows Summary', ''],
+        ['Metric', 'Value'],
+        ...Object.entries(cowsSummary[0] || {}),
+        [''],
+        ['Treatments Summary', ''],
+        ['Metric', 'Value'],
+        ...Object.entries(treatmentsSummary[0] || {})
+      ];
+      const csv = stringify(data);
+      return new NextResponse(csv, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': 'attachment; filename="admin_report.csv"'
+        }
+      });
+    }
+
     return NextResponse.json({ success: true, data: reportData });
   } catch (error) {
     console.error('Reports API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function GET(request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!['Admin', 'Owner/Admin', 'Doctor', 'Goshala Manager'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const format = searchParams.get('format') || 'json';
+    const reportType = searchParams.get('reportType') || 'overview';
+
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB);
+
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? new Date(dateTo) : null;
+
+    if (reportType === 'doctor_health_report') {
+      const match = {};
+      if (from || to) {
+        match.startedAt = {};
+        if (from) match.startedAt.$gte = from;
+        if (to) match.startedAt.$lte = to;
+      }
+      
+      const treatments = await db.collection('treatments').find(match).sort({ startedAt: -1 }).toArray();
+      
+      if (format === 'csv') {
+        const records = treatments.map(t => ({
+          tagId: t.tagId,
+          illness: t.illnessCategory || t.diagnosis || '',
+          startedAt: t.startedAt ? new Date(t.startedAt).toLocaleDateString() : '',
+          endedAt: t.endedAt ? new Date(t.endedAt).toLocaleDateString() : '',
+          status: t.status,
+          outcome: t.outcome || ''
+        }));
+        const csv = stringify(records, { header: true });
+        return new NextResponse(csv, {
+          headers: {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': `attachment; filename="doctor_health_report_${dateFrom || 'all'}.csv"`
+          }
+        });
+      }
+      return NextResponse.json({ success: true, treatments });
+    }
+
+    // Default overview report
+    const reportData = {
+      generatedAt: new Date().toISOString(),
+      message: 'Overview report logic under development'
+    };
+
+    return NextResponse.json({ success: true, data: reportData });
+  } catch (error) {
+    console.error('Reports GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

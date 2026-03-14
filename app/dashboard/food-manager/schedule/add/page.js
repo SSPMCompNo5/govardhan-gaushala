@@ -61,6 +61,16 @@ export default function AddSchedulePage() {
     }));
   };
 
+  const fetchCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -70,18 +80,16 @@ export default function AddSchedulePage() {
     }
 
     try {
-         // Get CSRF token
-      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
-      const { token } = await csrfRes.json();
-
       setLoading(true);
+      const token = await fetchCSRF();
 
       const response = await fetch('/api/food/schedule', {
         method: 'POST',
-     headers: {
+        headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'X-CSRF-Token': token } : {})
+          'X-CSRF-Token': token
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           ...formData,
           quantity: parseFloat(formData.quantity),
@@ -96,11 +104,11 @@ export default function AddSchedulePage() {
         router.push('/dashboard/food-manager/schedule');
       } else {
         console.error('Error creating schedule:', data.error);
-        // Error will be handled by toast system
+        alert(data.error || 'Failed to create schedule');
       }
     } catch (error) {
       console.error('Error creating schedule:', error);
-      // Error will be handled by toast system
+      alert('An error occurred while creating schedule');
     } finally {
       setLoading(false);
     }

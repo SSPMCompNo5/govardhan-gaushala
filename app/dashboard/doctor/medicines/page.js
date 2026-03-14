@@ -59,11 +59,14 @@ export default function DoctorMedicinesPage() {
   const [showUseDialog, setShowUseDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
-  const getCSRF = () => {
+  const fetchCSRF = async () => {
     try {
-      const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
-      return m ? decodeURIComponent(m[1]) : '';
-    } catch { return ''; }
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
   };
 
   const load = useCallback(async () => {
@@ -101,9 +104,10 @@ export default function DoctorMedicinesPage() {
 
   const onCreateMedicine = async () => {
     try {
+      const token = await fetchCSRF();
       const res = await fetch('/api/doctor/medicines', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
         credentials: 'same-origin',
         body: JSON.stringify(medForm)
       });
@@ -118,10 +122,11 @@ export default function DoctorMedicinesPage() {
 
   const onAddBatch = async () => {
     try {
+      const token = await fetchCSRF();
       const payload = { ...batchForm, receivedAt: new Date().toISOString() };
       const res = await fetch('/api/doctor/medicines/batches', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
         credentials: 'same-origin',
         body: JSON.stringify(payload)
       });
@@ -136,9 +141,10 @@ export default function DoctorMedicinesPage() {
 
   const onRecordUse = async () => {
     try {
+      const token = await fetchCSRF();
       const res = await fetch('/api/doctor/medicines/use', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
         credentials: 'same-origin',
         body: JSON.stringify(useForm)
       });

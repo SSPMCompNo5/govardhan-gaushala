@@ -25,8 +25,14 @@ export default function InfrastructurePage() {
 
   const todayStr = new Date().toISOString().slice(0,10);
   
-  const getCSRF = () => {
-    try { const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); return m?decodeURIComponent(m[1]):''; } catch { return ''; }
+  const fetchCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
   };
 
   const load = useCallback(async () => {
@@ -51,9 +57,15 @@ export default function InfrastructurePage() {
 
   const onAddChecklist = async () => {
     try {
+      const token = await fetchCSRF();
       const res = await fetch('/api/goshala-manager/infrastructure/checklists', {
-        method: 'POST', headers: addCSRFHeader({ 'Content-Type': 'application/json' }), 
-        credentials: 'same-origin', body: JSON.stringify({ ...checklistForm, date: todayStr })
+        method: 'POST', 
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        }, 
+        credentials: 'same-origin', 
+        body: JSON.stringify({ ...checklistForm, date: todayStr })
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error||'Failed');
@@ -66,9 +78,15 @@ export default function InfrastructurePage() {
 
   const onAddMaintenance = async () => {
     try {
+      const token = await fetchCSRF();
       const res = await fetch('/api/goshala-manager/infrastructure/maintenance', {
-        method: 'POST', headers: addCSRFHeader({ 'Content-Type': 'application/json' }), 
-        credentials: 'same-origin', body: JSON.stringify(maintenanceForm)
+        method: 'POST', 
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': token } : {})
+        }, 
+        credentials: 'same-origin', 
+        body: JSON.stringify(maintenanceForm)
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error||'Failed');
@@ -81,15 +99,15 @@ export default function InfrastructurePage() {
 
   const onAddAsset = async () => {
     try {
-      // Get CSRF token
-      const csrfRes = await fetch('/api/csrf', { credentials: 'same-origin' });
-      const { token } = await csrfRes.json();
+      const token = await fetchCSRF();
       const res = await fetch('/api/goshala-manager/infrastructure/assets', {
-        method: 'POST', headers: {
+        method: 'POST', 
+        headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'X-CSRF-Token': token } : {})
         }, 
-        credentials: 'same-origin', body: JSON.stringify(assetForm)
+        credentials: 'same-origin', 
+        body: JSON.stringify(assetForm)
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error||'Failed');

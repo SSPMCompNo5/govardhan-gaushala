@@ -75,15 +75,22 @@ export default function DoctorTreatmentsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const getCSRF = () => {
-    try { const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); return m?decodeURIComponent(m[1]):''; } catch { return ''; }
+  const fetchCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
   };
 
   const onCreate = async () => {
     try {
+      const token = await fetchCSRF();
       const payload = { ...form, startedAt: form.startedAt || new Date().toISOString(), attachments: attachments };
       const res = await fetch('/api/doctor/treatments', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() }, credentials: 'same-origin',
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, credentials: 'same-origin',
         body: JSON.stringify(payload)
       });
       const j = await res.json();
@@ -93,8 +100,9 @@ export default function DoctorTreatmentsPage() {
       // If medicine is prescribed, notify Food Manager
       if (form.medicine && form.tagId) {
         try {
+          const token = await fetchCSRF();
           await fetch('/api/admin/notify/medication', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() }, credentials: 'same-origin',
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, credentials: 'same-origin',
             body: JSON.stringify({ 
               cowId: form.tagId, 
               medicine: form.medicine, 
@@ -118,8 +126,9 @@ export default function DoctorTreatmentsPage() {
     const note = prompt('Follow-up note (optional):') || '';
     const when = prompt('Follow-up when (YYYY-MM-DD or ISO):', new Date(Date.now()+7*24*60*60*1000).toISOString().slice(0,16)) || '';
     try {
+      const token = await fetchCSRF();
       const res = await fetch('/api/doctor/treatments', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() }, credentials: 'same-origin',
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, credentials: 'same-origin',
         body: JSON.stringify({ id, followUp: { when, notes: note } })
       });
       const j = await res.json();
@@ -136,8 +145,9 @@ export default function DoctorTreatmentsPage() {
     const newOutcome = outcomes[nextIndex];
     
     try {
+      const token = await fetchCSRF();
       const res = await fetch('/api/doctor/treatments', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() }, credentials: 'same-origin',
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, credentials: 'same-origin',
         body: JSON.stringify({ id, outcome: newOutcome })
       });
       const j = await res.json();
@@ -158,9 +168,10 @@ export default function DoctorTreatmentsPage() {
       formData.append('treatmentId', 'temp_' + Date.now()); // Temporary ID for new treatments
       formData.append('description', prompt('File description (optional):') || '');
       
+      const token = await fetchCSRF();
       const res = await fetch('/api/doctor/attachments/upload', {
         method: 'POST',
-        headers: { 'X-CSRF-Token': getCSRF() },
+        headers: { 'X-CSRF-Token': token },
         credentials: 'same-origin',
         body: formData
       });

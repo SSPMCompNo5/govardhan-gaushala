@@ -40,22 +40,34 @@ export default function RecordFeedingPage() {
     }));
   };
 
+  const fetchCSRF = async () => {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'same-origin' });
+      const data = await res.json();
+      return data.token;
+    } catch {
+      return '';
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.foodType || !formData.quantity || !formData.cowGroup) {
-      // Validation error - will be handled by form validation
       return;
     }
 
     try {
       setLoading(true);
+      const token = await fetchCSRF();
 
       const response = await fetch('/api/food/feeding-logs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-CSRF-Token': token
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
           ...formData,
           quantity: parseFloat(formData.quantity),
@@ -67,15 +79,14 @@ export default function RecordFeedingPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Success - redirect to feedings page
         router.push('/dashboard/food-manager/feedings');
       } else {
         console.error('Error recording feeding:', data.error);
-        // Error will be handled by toast system
+        alert(data.error || 'Failed to record feeding');
       }
     } catch (error) {
       console.error('Error recording feeding:', error);
-      // Error will be handled by toast system
+      alert('An error occurred while recording feeding');
     } finally {
       setLoading(false);
     }
