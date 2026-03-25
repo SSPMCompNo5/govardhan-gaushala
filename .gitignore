@@ -90,9 +90,8 @@ out
 .nuxt
 dist
 
-# Gatsby files
-.cache/
-public
+# Next.js public directory - must be tracked (not Gatsby)
+# public
 
 # Vuepress build output
 .vuepress/dist
