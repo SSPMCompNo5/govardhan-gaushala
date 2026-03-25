@@ -93,6 +93,7 @@ open http://localhost:3000
 - **[Quick Start Guide](QUICK_START.md)** - Get running in 5 minutes
 - **[Friend Setup Guide](FRIEND_SETUP_GUIDE.md)** - Complete setup instructions
 - **[Docker Setup](DOCKER_SETUP.md)** - Docker configuration details
+- **[Render Deployment](RENDER_DEPLOYMENT.md)** - Deploy to Render (cloud)
 - **[Troubleshooting](TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Contributing](CONTRIBUTING.md)** - How to contribute to the project
 
